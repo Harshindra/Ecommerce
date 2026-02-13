@@ -1,0 +1,10 @@
+# Prerequisites
+node_modules/
+package-lock.json
+
+# Environment variables (Crucial for security)
+.env
+*.env
+
+# IDE - VS Code
+.vscode/
