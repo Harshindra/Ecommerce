@@ -5,10 +5,13 @@ const connectDB = require("./config/db");
 const User = require('./models/User');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
+const path = require('path'); 
+const uploadRoutes = require('./routes/uploadRoutes');
 
 dotenv.config();
 connectDB();
 const app = express();
+app.use(express.urlencoded({ extended: true }));
 
 // Middlewares
 app.use(cors());
@@ -25,6 +28,11 @@ app.get("/", (req, res) => {
 app.use('/api/users', userRoutes);
 // product
 app.use('/api/products', productRoutes); 
+
+//upload 
+app.use('/api/upload', uploadRoutes);
+const dirname = path.resolve();
+app.use('/uploads', express.static(path.join(dirname, '/uploads')));
 
 
 

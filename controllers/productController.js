@@ -8,21 +8,40 @@ const getProducts = async (req, res) => {
     res.json(products);
 };
 
+// @desc    Fetch single product
+// @route   GET /api/products/:id
+// @access  Public
+const getProductById = async (req, res) => {
+    const product = await Product.findById(req.params.id).populate('reviews.user', 'name email');
+
+    if (product) {
+        res.json(product);
+    } else {
+        res.status(404);
+        throw new Error('Product not found');
+    }
+};
+
 // @desc    Create a product
 // @route   POST /api/products
-// @access  Private/Seller/Admin
+// @access  Private/Seller
 const createProduct = async (req, res) => {
-    const { name, price, description, image, brand, category, countInStock } =
-        req.body;
+    const { name, price, description, brand, category, countInStock } = req.body;
+
+    // Handle Image Upload (Multer)
+    // If file exists, use Cloudinary URL. If not, use default.
+    const image = req.file ? req.file.path : '/images/sample.jpg';
+
     const product = new Product({
-        name: name,
-        price: price,
-        user: req.user._id, // The logged-in seller's ID
-        image: image,
-        brand: brand,
-        category: category,
-        countInStock: countInStock,
-        description: description,
+        name,
+        price,
+        user: req.user._id,
+        image,
+        brand,
+        category,
+        countInStock,
+        numReviews: 0,
+        description,
     });
 
     const createdProduct = await product.save();
@@ -33,38 +52,69 @@ const createProduct = async (req, res) => {
 // @route   PUT /api/products/:id
 // @access  Private/Seller/Admin
 const updateProduct = async (req, res) => {
-    const { name, price, description, image, brand, category, countInStock } =
-        req.body;
+    const { name, price, description, brand, category, countInStock } = req.body;
 
     const product = await Product.findById(req.params.id);
 
     if (product) {
-        // Check if the user owns this product before updating
-        if (product.user.toString() !== req.user._id.toString())
+        // 🔒 SECURITY: Check ownership
+        // Allow update if User is Admin OR User is the Owner
+        if (product.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            res.status(401);
+            throw new Error('Not authorized to update this product');
+        }
 
-        product.name = name;
-        product.price = price;
-        product.description = description;
-        product.image = image;
-        product.brand = brand;
-        product.category = category;
-        product.countInStock = countInStock;
+        product.name = name || product.name;
+        product.price = price || product.price;
+        product.description = description || product.description;
+        product.brand = brand || product.brand;
+        product.category = category || product.category;
+        product.countInStock = countInStock || product.countInStock;
+        
+        // If a new image is uploaded, update it. Otherwise keep old one.
+        if (req.file) {
+            product.image = req.file.path;
+        }
 
         const updatedProduct = await product.save();
         res.json(updatedProduct);
     } else {
-        res.status(404).json({ message: 'Product not found' });
+        res.status(404);
+        throw new Error('Product not found');
     }
 };
 
+// @desc    Delete a product
+// @route   DELETE /api/products/:id
+// @access  Private/Seller/Admin
+const deleteProduct = async (req, res) => {
+    const product = await Product.findById(req.params.id);
 
+    if (product) {
+        // SECURITY: Check ownership
+        if (product.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            res.status(401);
+            throw new Error('Not authorized to delete this product');
+        }
+
+        await product.deleteOne();
+        res.json({ message: 'Product removed' });
+    } else {
+        res.status(404);
+        throw new Error('Product not found');
+    }
+};
+
+// @desc    Create new review
+// @route   POST /api/products/:id/reviews
+// @access  Private
 const createProductReview = async (req, res) => {
     const { rating, comment } = req.body;
 
     const product = await Product.findById(req.params.id);
 
     if (product) {
-        // 1. Check if user already reviewed
+        // Check if already reviewed
         const alreadyReviewed = product.reviews.find(
             (r) => r.user.toString() === req.user._id.toString()
         );
@@ -74,7 +124,6 @@ const createProductReview = async (req, res) => {
             throw new Error('Product already reviewed');
         }
 
-        // 2. Create review object
         const review = {
             name: req.user.name,
             rating: Number(rating),
@@ -82,14 +131,10 @@ const createProductReview = async (req, res) => {
             user: req.user._id,
         };
 
-        // 3. Add to reviews array
         product.reviews.push(review);
-
-        // 4. Update total number of reviews
         product.numReviews = product.reviews.length;
-
-        // 5. Calculate new average rating
-        // (Sum of all ratings) / (Total reviews)
+        
+        // Calculate Average Rating
         product.rating =
             product.reviews.reduce((acc, item) => item.rating + acc, 0) /
             product.reviews.length;
@@ -97,7 +142,16 @@ const createProductReview = async (req, res) => {
         await product.save();
         res.status(201).json({ message: 'Review added' });
     } else {
-        res.status(404).json({ message: 'Product not found' });
+        res.status(404);
+        throw new Error('Product not found');
     }
 };
-module.exports = { getProducts, createProduct, updateProduct,createProductReview };
+
+module.exports = {
+    getProducts,
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    createProductReview,
+};

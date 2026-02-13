@@ -2,20 +2,42 @@ const express = require('express');
 const router = express.Router();
 const {
     getProducts,
+    getProductById,
     createProduct,
     updateProduct,
-    createProductReview
+    deleteProduct,
+    createProductReview,
 } = require('../controllers/productController');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../middleware/uploadMiddleware'); // Your Cloudinary Multer
 
-// Public Route (Everyone can see products)
-router.get('/', getProducts);
+// Public Routes
+router.route('/').get(getProducts);
+router.route('/:id').get(getProductById);
 
-// Protected Routes (Only Sellers and Admins)
-router.post('/', protect, authorize('seller', 'admin'), createProduct);
-router.put('/:id', protect, authorize('seller', 'admin'), updateProduct);
+// Protected Routes (Product Management)
+router.route('/')
+    .post(
+        protect, 
+        authorize('seller'), 
+        upload.single('image'), 
+        createProduct
+    );
 
-// review route
+router.route('/:id')
+    .put(
+        protect, 
+        authorize('seller'), 
+        upload.single('image'), 
+        updateProduct
+    )
+    .delete(
+        protect, 
+        authorize('seller', 'admin'), 
+        deleteProduct
+    );
+
+// Protected Routes (Reviews)
 router.route('/:id/reviews').post(protect, createProductReview);
 
 module.exports = router;
