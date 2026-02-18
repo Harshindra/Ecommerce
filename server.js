@@ -7,6 +7,7 @@ const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const path = require('path'); 
 const uploadRoutes = require('./routes/uploadRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
 dotenv.config();
 connectDB();
@@ -28,6 +29,8 @@ app.get("/", (req, res) => {
 app.use('/api/users', userRoutes);
 // product
 app.use('/api/products', productRoutes); 
+// orders
+app.use('/api/orders', orderRoutes);
 
 //upload 
 app.use('/api/upload', uploadRoutes);
